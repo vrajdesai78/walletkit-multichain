@@ -1,109 +1,94 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { WalletKit } from "@reown/walletkit";
-import { Core } from "@walletconnect/core";
-// import { buildApprovedNamespaces, getSdkError } from "@walletconnect/utils";
+import { useCallback, useEffect, useState } from "react";
+import { walletkit } from "@/utils/WalletConnectUtils";
+import { SignClientTypes } from "@walletconnect/types";
+import ConnectionDialog from "@/components/ConnectionDialog";
+import { useWalletStore } from "@/store/wallet";
+import { getSdkError } from "@walletconnect/utils";
 
 export default function Home() {
   const [uri, setUri] = useState<string>("");
+  const [open, setOpen] = useState<boolean>(false);
+  const { setData, sessions, removeSession } = useWalletStore();
+  const [proposalOpen, setProposalOpen] = useState<boolean>(false);
+
+  const onSessionProposal = useCallback(
+    async (proposal: SignClientTypes.EventArguments["session_proposal"]) => {
+      setOpen(true);
+      setData({ proposal });
+    },
+    []
+  );
+
+  const onSessionRequest = useCallback(
+    async (request: SignClientTypes.EventArguments["session_request"]) => {
+      setProposalOpen(true);
+      setData({ requestEvent: request });
+    },
+    []
+  );
 
   useEffect(() => {
-    const core = new Core({
-      projectId: process.env.NEXT_PUBLIC_PROJECT_ID,
-    });
-    const initializeWalletKit = async () => {
-      const walletKit = await WalletKit.init({
-        core,
-        metadata: {
-          name: "Vraj Wallet",
-          description: "Demo of Vraj's Wallet",
-          url: "https://reown.com/walletkit",
-          icons: [],
-        },
-      });
-
-      walletKit.on("session_proposal", (proposal) => {
-        console.log("Session proposal:", proposal);
-      });
-    };
-
-    initializeWalletKit();
-  }, []);
-
-  // const handleApproveSession = async () => {
-  //   if (!sessionProposal || !client) return;
-
-  //   try {
-  //     const { id, params } = sessionProposal;
-  //     const approvedNamespaces = buildApprovedNamespaces({
-  //       proposal: params,
-  //       supportedNamespaces: {
-  //         eip155: {
-  //           chains: ["eip155:1", "eip155:137"],
-  //           methods: ["eth_sendTransaction", "personal_sign"],
-  //           events: ["accountsChanged", "chainChanged"],
-  //           accounts: [
-  //             "eip155:1:0xab16a96d359ec26a11e2c2b3d8f8b8942d5bfcdb",
-  //             "eip155:137:0xab16a96d359ec26a11e2c2b3d8f8b8942d5bfcdb",
-  //           ],
-  //         },
-  //       },
-  //     });
-
-  //     const session = await client.approveSession({
-  //       id,
-  //       namespaces: approvedNamespaces,
-  //     });
-
-  //     setSessionProposal(null);
-  //     console.log("Session approved:", session);
-  //   } catch (error) {
-  //     console.error("Failed to approve session:", error);
-  //   }
-  // };
-
-  // const handleRejectSession = async () => {
-  //   if (!sessionProposal || !client) return;
-
-  //   try {
-  //     await client.rejectSession({
-  //       id: sessionProposal.id,
-  //       reason: getSdkError("USER_REJECTED"),
-  //     });
-  //     setSessionProposal(null);
-  //   } catch (error) {
-  //     console.error("Failed to reject session:", error);
-  //   }
-  // };
+    if (walletkit) {
+      walletkit.on("session_proposal", onSessionProposal);
+      walletkit.on("session_request", onSessionRequest);
+    }
+  }, [onSessionProposal, walletkit, onSessionRequest]);
 
   const handleConnect = async () => {
-    const core = new Core({
-      projectId: process.env.NEXT_PUBLIC_PROJECT_ID,
+    await walletkit.pair({ uri });
+  };
+
+  const removeSessionHandler = (publicKey: string) => {
+    walletkit.disconnectSession({
+      topic: sessions.find((s) => s.peer?.publicKey === publicKey)
+        ?.topic as string,
+      reason: getSdkError("USER_DISCONNECTED"),
     });
-    const walletKit = await WalletKit.init({
-      core,
-      metadata: {
-        name: "Vraj Wallet",
-        description: "Demo of Vraj's Wallet",
-        url: "https://reown.com/walletkit",
-        icons: ["https://reown.com/walletkit/icon.png"],
-      },
-    });
-    await walletKit.pair({ uri });
+    removeSession(publicKey);
   };
 
   return (
     <div className='flex flex-col items-center justify-center h-screen gap-4'>
+      <ConnectionDialog
+        open={open}
+        onOpenChange={() => setOpen(false)}
+        type='proposal'
+      />
+      <ConnectionDialog
+        open={proposalOpen}
+        onOpenChange={() => setProposalOpen(false)}
+        type='request'
+      />
       <h1 className='text-2xl font-bold'>MiniWallet</h1>
       <input
-        className='border border-gray-300 rounded-md p-2 min-w-[300px] bg-slate-800'
+        className='border border-gray-500 rounded-md p-2 min-w-[300px] bg-slate-300'
         type='text'
         placeholder='Enter Wallet Connect URI'
         value={uri}
         onChange={(e) => setUri(e.target.value)}
       />
-      <button onClick={handleConnect}>Connect</button>
+      <button
+        className='border border-gray-500 rounded-md p-2 min-w-[300px] bg-slate-300'
+        onClick={handleConnect}
+      >
+        Connect
+      </button>
+      {sessions.map((session) => (
+        <div
+          key={session.peer?.publicKey}
+          className='flex items-center justify-between gap-2'
+        >
+          {session.peer?.metadata?.name}
+          <button
+            className='border border-gray-500 rounded-md p-2 min-w-[300px] bg-slate-300'
+            onClick={() => removeSessionHandler(session.peer?.publicKey)}
+          >
+            Disconnect
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
