@@ -1,17 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { walletkit } from "@/utils/WalletConnectUtils";
 import { SignClientTypes } from "@walletconnect/types";
-import ConnectionDialog from "@/components/ConnectionDialog";
+import { ConnectionDialog } from "@/components/ConnectionDialog";
 import { useWalletStore } from "@/store/wallet";
 import { getSdkError } from "@walletconnect/utils";
+import { getWalletKit } from "@/utils/helper";
 
 export default function Home() {
   const [uri, setUri] = useState<string>("");
   const [open, setOpen] = useState<boolean>(false);
   const { setData, sessions, removeSession } = useWalletStore();
   const [proposalOpen, setProposalOpen] = useState<boolean>(false);
+
+  const walletkit = getWalletKit();
 
   const onSessionProposal = useCallback(
     async (proposal: SignClientTypes.EventArguments["session_proposal"]) => {
@@ -61,7 +63,7 @@ export default function Home() {
         onOpenChange={() => setProposalOpen(false)}
         type='request'
       />
-      <h1 className='text-2xl font-bold'>MiniWallet</h1>
+      <h1 className='text-2xl font-bold'>CoolWallet</h1>
       <input
         className='border border-gray-500 rounded-md p-2 min-w-[300px] bg-slate-300'
         type='text'

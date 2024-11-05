@@ -1,17 +1,13 @@
 "use client";
 
-import { createWalletKit } from "@/utils/WalletConnectUtils";
+import { initializeWallet } from "@/utils/helper";
 import { useCallback, useEffect, useState } from "react";
 
-export const WalletInitialise = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+export const WalletWrapper = ({ children }: { children: React.ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
 
   const onInitialize = useCallback(async () => {
-    await createWalletKit();
+    await initializeWallet();
     setInitialized(true);
   }, []);
 
