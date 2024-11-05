@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -21,10 +20,12 @@ export function ConnectionDialog({
   onOpenChange,
   type,
 }: ConnectionDialogProps) {
-  const { handleAccept, handleReject, getMessage } = useConnectionDialog(
-    type,
-    onOpenChange
-  );
+  const {
+    handleApproveProposal,
+    handleRejectProposal,
+    getMessage,
+    handleApproveSignRequest,
+  } = useConnectionDialog(type, onOpenChange);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -33,17 +34,34 @@ export function ConnectionDialog({
           <DialogTitle>
             {type === "proposal" ? "Approve Connection" : "Sign Message"}
           </DialogTitle>
-          <DialogDescription>
+        </DialogHeader>
+        <div className='max-h-[200px] overflow-y-auto'>
+          <p className='break-words whitespace-pre-wrap overflow-hidden text-wrap text-muted-foreground'>
             {type === "proposal"
               ? "Do you want to approve this connection request?"
               : `Sign the message: ${getMessage()}`}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className='flex gap-2'>
-          <Button variant='destructive' onClick={handleReject}>
+          </p>
+        </div>
+        <DialogFooter className='flex flex-col sm:flex-row gap-2 w-full'>
+          <Button
+            variant='destructive'
+            onClick={handleRejectProposal}
+            className='flex-1'
+          >
             Reject
           </Button>
-          <Button onClick={handleAccept}>Accept</Button>
+          <Button
+            onClick={() => {
+              if (type === "proposal") {
+                handleApproveProposal();
+              } else {
+                handleApproveSignRequest();
+              }
+            }}
+            className='flex-1'
+          >
+            Accept
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

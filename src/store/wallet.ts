@@ -12,19 +12,13 @@ interface ModalData {
 export interface WalletState {
   data: ModalData;
   setData: (data: ModalData) => void;
-  sessions: SessionTypes.Struct[];
-  addSession: (session: SessionTypes.Struct) => void;
-  removeSession: (publicKey: string) => void;
+  activeSessions: Record<string, SessionTypes.Struct>;
+  setActiveSessions: (sessions: Record<string, SessionTypes.Struct>) => void;
 }
 
 export const useWalletStore = create<WalletState>((set) => ({
   data: {},
   setData: (data) => set({ data }),
-  sessions: [],
-  addSession: (session) =>
-    set((state) => ({ sessions: [...state.sessions, session] })),
-  removeSession: (publicKey) =>
-    set((state) => ({
-      sessions: state.sessions.filter((s) => s.peer?.publicKey !== publicKey),
-    })),
+  activeSessions: {},
+  setActiveSessions: (sessions) => set({ activeSessions: sessions }),
 }));
