@@ -1,15 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WalletKit, WalletKitTypes } from "@reown/walletkit";
+import { WalletKit } from "@reown/walletkit";
 import { Core } from "@walletconnect/core";
-import { WalletKit as WalletKitType } from "@reown/walletkit/dist/types/client";
-import { buildApprovedNamespaces, getSdkError } from "@walletconnect/utils";
+// import { buildApprovedNamespaces, getSdkError } from "@walletconnect/utils";
 
 export default function Home() {
-  const [client, setClient] = useState<WalletKitType | null>(null);
-  const [sessionProposal, setSessionProposal] =
-    useState<WalletKitTypes.SessionProposal | null>(null);
   const [uri, setUri] = useState<string>("");
 
   useEffect(() => {
@@ -26,61 +22,60 @@ export default function Home() {
           icons: [],
         },
       });
-      setClient(walletKit);
 
       walletKit.on("session_proposal", (proposal) => {
-        setSessionProposal(proposal);
+        console.log("Session proposal:", proposal);
       });
     };
 
     initializeWalletKit();
   }, []);
 
-  const handleApproveSession = async () => {
-    if (!sessionProposal || !client) return;
+  // const handleApproveSession = async () => {
+  //   if (!sessionProposal || !client) return;
 
-    try {
-      const { id, params } = sessionProposal;
-      const approvedNamespaces = buildApprovedNamespaces({
-        proposal: params,
-        supportedNamespaces: {
-          eip155: {
-            chains: ["eip155:1", "eip155:137"],
-            methods: ["eth_sendTransaction", "personal_sign"],
-            events: ["accountsChanged", "chainChanged"],
-            accounts: [
-              "eip155:1:0xab16a96d359ec26a11e2c2b3d8f8b8942d5bfcdb",
-              "eip155:137:0xab16a96d359ec26a11e2c2b3d8f8b8942d5bfcdb",
-            ],
-          },
-        },
-      });
+  //   try {
+  //     const { id, params } = sessionProposal;
+  //     const approvedNamespaces = buildApprovedNamespaces({
+  //       proposal: params,
+  //       supportedNamespaces: {
+  //         eip155: {
+  //           chains: ["eip155:1", "eip155:137"],
+  //           methods: ["eth_sendTransaction", "personal_sign"],
+  //           events: ["accountsChanged", "chainChanged"],
+  //           accounts: [
+  //             "eip155:1:0xab16a96d359ec26a11e2c2b3d8f8b8942d5bfcdb",
+  //             "eip155:137:0xab16a96d359ec26a11e2c2b3d8f8b8942d5bfcdb",
+  //           ],
+  //         },
+  //       },
+  //     });
 
-      const session = await client.approveSession({
-        id,
-        namespaces: approvedNamespaces,
-      });
+  //     const session = await client.approveSession({
+  //       id,
+  //       namespaces: approvedNamespaces,
+  //     });
 
-      setSessionProposal(null);
-      console.log("Session approved:", session);
-    } catch (error) {
-      console.error("Failed to approve session:", error);
-    }
-  };
+  //     setSessionProposal(null);
+  //     console.log("Session approved:", session);
+  //   } catch (error) {
+  //     console.error("Failed to approve session:", error);
+  //   }
+  // };
 
-  const handleRejectSession = async () => {
-    if (!sessionProposal || !client) return;
+  // const handleRejectSession = async () => {
+  //   if (!sessionProposal || !client) return;
 
-    try {
-      await client.rejectSession({
-        id: sessionProposal.id,
-        reason: getSdkError("USER_REJECTED"),
-      });
-      setSessionProposal(null);
-    } catch (error) {
-      console.error("Failed to reject session:", error);
-    }
-  };
+  //   try {
+  //     await client.rejectSession({
+  //       id: sessionProposal.id,
+  //       reason: getSdkError("USER_REJECTED"),
+  //     });
+  //     setSessionProposal(null);
+  //   } catch (error) {
+  //     console.error("Failed to reject session:", error);
+  //   }
+  // };
 
   const handleConnect = async () => {
     const core = new Core({
