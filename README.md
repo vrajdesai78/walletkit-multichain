@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WalletKit Demo Project
 
-## Getting Started
+A demo wallet interface showcasing the integration of Reown [WalletKit](https://docs.reown.com/walletkit/web/usage) with Next.js. This wallet is live at [https://walletkit-reown.vercel.app/](https://walletkit-reown.vercel.app/).
 
-First, run the development server:
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+- Node.js (version 16 or higher)
+- Ngrok or similar tunneling service (for HTTPS access)
+
+## Setup
+
+1. Clone the repository:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/walletkit/walletkit-demo.git
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Environment Setup:
 
-## Learn More
+Copy the `.example.env` file to `.env.local`:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .example.env .env.local
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Update the environment variables in `.env.local`:
+  - `NEXT_PUBLIC_PROJECT_ID`: Your WalletConnect Project ID (required)
+  - `NEXT_PUBLIC_PRIVATE_KEY`: Your private key (optional)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Running the Project
 
-## Deploy on Vercel
+1. Start the development server:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+pnpm dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Start ngrok or similar tunneling service:
+
+```bash
+ngrok http 3000 // replace 3000 with the port number of your local server
+```
+
+3. Use the HTTPS URL provided by ngrok to access your application
+
+## Project Structure
+
+- `/src/app`: Main application pages and layouts
+- `/src/components`: Reusable UI components
+- `/src/context`: React context providers
+- `/src/hooks`: Custom React hooks
+- `/src/utils`: Utility functions
+- `/src/store`: State management using Zustand
+- `/src/types`: TypeScript type definitions
+
+## Features
+
+- Connect with any dApp that supports WalletConnect
+- Session management, with the ability to connect, accept, reject, and delete sessions
+- Message signing, sign messages with your wallet from any connected dApp
+
+
+
