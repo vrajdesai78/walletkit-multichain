@@ -1,6 +1,8 @@
 "use client";
 
 import { initializeWallet } from "@/utils/helper";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
 
@@ -8,6 +10,7 @@ export const WalletWrapper = ({ children }: { children: React.ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = new QueryClient();
 
   const onInitialize = useCallback(async () => {
     try {
@@ -64,8 +67,10 @@ export const WalletWrapper = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <>
-      {children}
-      <Toaster />
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <Toaster />
+      </QueryClientProvider>
     </>
   );
 };

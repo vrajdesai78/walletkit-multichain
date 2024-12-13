@@ -13,13 +13,12 @@ import {
   createPublicClient,
   createWalletClient,
   decodeFunctionData,
-  decodeFunctionResult,
   erc20Abi,
   formatUnits,
   http,
   WalletClient,
 } from "viem";
-import { mainnet, sepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 import { encodedTransaction, Transaction } from "@/types";
 
 let walletKit: IWalletKit | null = null;

@@ -18,6 +18,7 @@ import {
   SUPPORTED_METHODS,
 } from "@/constants";
 import { sepolia } from "viem/chains";
+import { QueryClient } from "@tanstack/react-query";
 
 export function useConnectionDialog(
   type: DialogType,
@@ -129,6 +130,10 @@ export function useConnectionDialog(
         toast.success("Transaction sent successfully!", {
           duration: 5000,
         });
+
+        const queryClient = new QueryClient();
+        queryClient.invalidateQueries({ queryKey: ["balances"] });
+
         onOpenChange(false);
       }
     } catch (error) {

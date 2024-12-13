@@ -10,6 +10,7 @@ import { useConnectionDialog } from "@/hooks/useConnectionDialog";
 import { useWalletStore } from "@/store/wallet";
 import { DialogType } from "@/types";
 import { formatUnits } from "viem";
+import { useState } from "react";
 
 interface ConnectionDialogProps {
   open: boolean;
@@ -22,6 +23,8 @@ export function ConnectionDialog({
   onOpenChange,
   type,
 }: ConnectionDialogProps) {
+  const [isAccepting, setIsAccepting] = useState(false);
+
   const {
     handleApproveProposal,
     handleRejectProposal,
@@ -87,20 +90,27 @@ export function ConnectionDialog({
               }
             }}
             className='flex-1'
+            disabled={isAccepting}
           >
             Reject
           </Button>
           <Button
-            onClick={() => {
-              if (type === "proposal") {
-                handleApproveProposal();
-              } else {
-                handleApproveSignRequest();
+            onClick={async () => {
+              setIsAccepting(true);
+              try {
+                if (type === "proposal") {
+                  await handleApproveProposal();
+                } else {
+                  await handleApproveSignRequest();
+                }
+              } finally {
+                setIsAccepting(false);
               }
             }}
             className='flex-1'
+            disabled={isAccepting}
           >
-            Accept
+            {isAccepting ? "Accepting..." : "Accept"}
           </Button>
         </DialogFooter>
       </DialogContent>
