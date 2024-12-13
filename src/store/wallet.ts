@@ -1,3 +1,4 @@
+import { Transaction } from "@/types";
 import { SessionTypes, SignClientTypes } from "@walletconnect/types";
 import { create } from "zustand";
 
@@ -7,6 +8,7 @@ interface ModalData {
   requestSession?: SessionTypes.Struct;
   loadingMessage?: string;
   authRequest?: SignClientTypes.EventArguments["session_authenticate"];
+  txnData?: Transaction;
 }
 
 export interface WalletState {

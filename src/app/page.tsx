@@ -5,18 +5,29 @@ import { SignClientTypes } from "@walletconnect/types";
 import { ConnectionDialog } from "@/components/ConnectionDialog";
 import { useWalletStore } from "@/store/wallet";
 import { getSdkError } from "@walletconnect/utils";
-import { getWalletKit } from "@/utils/helper";
+import {
+  decodeTransaction,
+  getAddress,
+  getBalance,
+  getUsdcBalance,
+  getWalletKit,
+} from "@/utils/helper";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { CopyIcon } from "@radix-ui/react-icons";
+import Image from "next/image";
+import toast from "react-hot-toast";
 
 export default function Home() {
   // State management for WalletConnect URI and dialog controls
   const [uri, setUri] = useState<string>("");
   const [open, setOpen] = useState<boolean>(false);
   const [proposalOpen, setProposalOpen] = useState<boolean>(false);
+  const [balance, setBalance] = useState<string>("0");
+  const [usdcBalance, setUsdcBalance] = useState<string>("0");
 
   // Global wallet state management
-  const { setData, activeSessions, setActiveSessions } = useWalletStore();
+  const { data, setData, activeSessions, setActiveSessions } = useWalletStore();
 
   // Get instance of walletkit
   const walletkit = getWalletKit();
@@ -33,16 +44,40 @@ export default function Home() {
   // Handler for incoming session requests
   const onSessionRequest = useCallback(
     async (request: SignClientTypes.EventArguments["session_request"]) => {
-      setProposalOpen(true);
-      setData({ requestEvent: request });
+      try {
+        const { method, params } = request.params.request;
+        if (method === "eth_sendTransaction") {
+          const transaction = decodeTransaction(params[0]);
+          setProposalOpen(true);
+          setData({ requestEvent: request, txnData: transaction });
+        } else if (method === "personal_sign") {
+          setProposalOpen(true);
+          setData({ requestEvent: request });
+        } else {
+          throw new Error("Unsupported method");
+        }
+      } catch (error) {
+        console.error(error);
+      }
     },
     []
   );
 
-  // Set up WalletConnect event listeners
   useEffect(() => {
     // Initialize active sessions
     setActiveSessions(walletkit.getActiveSessions());
+
+    if (balance === "0") {
+      getBalance().then((bal) => {
+        setBalance(bal);
+      });
+    }
+
+    if (usdcBalance === "0") {
+      getUsdcBalance().then((bal) => {
+        setUsdcBalance(bal);
+      });
+    }
 
     if (walletkit) {
       // Register event handlers for session lifecycle events
@@ -51,8 +86,17 @@ export default function Home() {
       walletkit.on("session_delete", () => {
         setActiveSessions(walletkit.getActiveSessions());
       });
+
+      // Cleanup function to remove event listeners
+      return () => {
+        walletkit.off("session_proposal", onSessionProposal);
+        walletkit.off("session_request", onSessionRequest);
+        walletkit.off("session_delete", () => {
+          setActiveSessions(walletkit.getActiveSessions());
+        });
+      };
     }
-  }, [onSessionProposal, walletkit]);
+  }, [onSessionProposal, onSessionRequest, walletkit]);
 
   // Handler for initiating new connections
   const handleConnect = async () => {
@@ -60,7 +104,7 @@ export default function Home() {
   };
 
   return (
-    <div className='min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8'>
+    <div className='min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8'>
       <div className='max-w-md mx-auto'>
         {/* Connection Dialogs */}
         <ConnectionDialog
@@ -71,7 +115,7 @@ export default function Home() {
         <ConnectionDialog
           open={proposalOpen}
           onOpenChange={() => setProposalOpen(false)}
-          type='request'
+          type={data?.txnData ? "sendTransaction" : "request"}
         />
 
         {/* Header Section */}
@@ -82,8 +126,56 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Connection Input Section */}
-        <div className='bg-white p-4 rounded-lg shadow-md mb-8'>
+        {/* Combined Wallet Balance and Connection Section */}
+        <div className='text-center mb-6'>
+          {/* Main Balance Card */}
+          <div className='bg-white p-6 rounded-lg shadow-sm mb-6'>
+            {/* Wallet Address Section */}
+            <div className='flex items-center justify-center gap-2 mb-4 bg-slate-100 p-1 rounded-lg w-fit mx-auto'>
+              <div className='text-sm text-gray-500 font-mono'>
+                {getAddress().slice(0, 6)}...{getAddress().slice(-4)}
+              </div>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='p-0 h-auto'
+                onClick={() => {
+                  navigator.clipboard.writeText(getAddress());
+                  toast.success("Address copied to clipboard");
+                }}
+              >
+                <CopyIcon className='h-4 w-4' />
+              </Button>
+            </div>
+
+            {/* ETH Balance Section */}
+            <div className='text-4xl font-bold text-gray-900 mb-4'>
+              {Number(balance).toFixed(4)} ETH
+            </div>
+
+            {/* Token List Section */}
+            <div className='divide-y divide-gray-100'>
+              <p className='text-sm text-gray-500 mb-2'>Tokens</p>
+              <div className='flex items-center justify-between py-3'>
+                <div className='flex items-center gap-2'>
+                  <Image
+                    src='https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
+                    alt='USDC'
+                    width={32}
+                    height={32}
+                    className='rounded-full'
+                    loader={({ src }) => src}
+                  />
+                  <span className='font-medium text-gray-900'>USDC</span>
+                </div>
+                <div className='text-right'>
+                  <div className='text-lg font-bold text-gray-900'>
+                    {usdcBalance} USDC
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div className='flex flex-col sm:flex-row gap-4'>
             <Input
               className='w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'

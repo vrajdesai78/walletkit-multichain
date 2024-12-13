@@ -16,4 +16,15 @@ export interface WalletState {
   removeSession: (publicKey: string) => void;
 }
 
-export type DialogType = "proposal" | "request";
+export type DialogType = "proposal" | "request" | "sendTransaction";
+
+export type Transaction = {
+  amount: bigint;
+  to: string;
+};
+
+export type encodedTransaction = {
+  to: string;
+  from: string;
+  data: string;
+};

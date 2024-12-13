@@ -15,6 +15,7 @@ export const WalletWrapper = ({ children }: { children: React.ReactNode }) => {
       await initializeWallet();
       setInitialized(true);
     } catch (err) {
+      console.log(err);
       setError(
         err instanceof Error ? err.message : "Failed to initialize wallet"
       );
