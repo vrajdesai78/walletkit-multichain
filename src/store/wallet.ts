@@ -9,6 +9,7 @@ interface ModalData {
   loadingMessage?: string;
   authRequest?: SignClientTypes.EventArguments["session_authenticate"];
   txnData?: Transaction;
+  txnType?: "sign" | "send";
 }
 
 export interface WalletState {

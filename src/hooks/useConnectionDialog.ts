@@ -6,6 +6,10 @@ import {
   getWalletAccount,
   getWalletClient,
   getWalletKit,
+  signPolkadotMessage,
+  signPolkadotTransaction,
+  signSolanaMessage,
+  signSolanaTransaction,
 } from "@/utils/helper";
 import { buildApprovedNamespaces, getSdkError } from "@walletconnect/utils";
 import { ProposalTypes } from "@walletconnect/types";
@@ -17,7 +21,7 @@ import {
   SUPPORTED_EVENTS,
   SUPPORTED_METHODS,
 } from "@/constants";
-import { sepolia } from "viem/chains";
+import { sepolia, baseSepolia } from "viem/chains";
 import { QueryClient } from "@tanstack/react-query";
 
 export function useConnectionDialog(
@@ -35,13 +39,23 @@ export function useConnectionDialog(
     ) {
       return hexToString(data.requestEvent?.params?.request?.params[0]);
     }
+    if (
+      type === "request" &&
+      data.requestEvent &&
+      data.requestEvent.params?.request?.method === "solana_signMessage"
+    ) {
+      const message = data.requestEvent?.params?.request?.params?.message;
+      return message;
+    }
     return "";
   }, [type, data.requestEvent]);
 
   // Called when the user approves the connection proposal
   const handleApproveProposal = useCallback(async () => {
     try {
-      const address = getAddress();
+      const evmAddress = getAddress("evm");
+      const solanaAddress = getAddress("solana");
+      const polkadotAddress = getAddress("polkadot");
       const approvedNamespaces = buildApprovedNamespaces({
         proposal: data.proposal?.params as ProposalTypes.Struct,
         supportedNamespaces: {
@@ -49,11 +63,34 @@ export function useConnectionDialog(
             chains: SUPPORTED_CHAINS,
             methods: SUPPORTED_METHODS,
             events: SUPPORTED_EVENTS,
-            accounts: [`eip155:11155111:${address}`],
+            accounts: [
+              `eip155:${sepolia.id}:${evmAddress}`,
+              `eip155:${baseSepolia.id}:${evmAddress}`,
+            ],
+          },
+          solana: {
+            chains: ["solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"],
+            methods: [
+              "solana_signTransaction",
+              "solana_signMessage",
+              "solana_signAndSendTransaction",
+              "solana_signAllTransactions",
+            ],
+            events: [],
+            accounts: [
+              `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:${solanaAddress}`,
+            ],
+          },
+          polkadot: {
+            chains: ["polkadot:e143f23803ac50e8f6f8e62695d1ce9e"],
+            methods: ["polkadot_signTransaction", "polkadot_signMessage"],
+            events: ["accountChanged"],
+            accounts: [
+              `polkadot:e143f23803ac50e8f6f8e62695d1ce9e:${polkadotAddress}`,
+            ],
           },
         },
       });
-
       // Approve the session
       await walletKit.approveSession({
         id: data.proposal?.id as number,
@@ -73,72 +110,124 @@ export function useConnectionDialog(
   const handleApproveSignRequest = useCallback(async () => {
     try {
       const client = getWalletClient();
+      const method = data.requestEvent?.params?.request?.method;
 
-      console.log("request", data.requestEvent);
+      switch (method) {
+        case "personal_sign": {
+          const message = getMessage();
+          const signature = await client.signMessage({
+            message,
+            account: getWalletAccount(),
+          });
+          await walletKit.respondSessionRequest({
+            topic: data.requestEvent?.topic as string,
+            response: {
+              id: data.requestEvent?.id as number,
+              result: signature,
+              jsonrpc: "2.0",
+            },
+          });
+          toast.success("Message signed successfully!");
+          break;
+        }
 
-      if (data.requestEvent?.params?.request?.method === "personal_sign") {
-        // Get the message to sign
-        const requestParamsMessage =
-          data.requestEvent?.params?.request?.params[0];
+        case "eth_sendTransaction": {
+          const transaction = data.requestEvent?.params?.request
+            ?.params[0] as encodedTransaction;
+          const gas = await estimateGas(transaction);
+          const txn = await client.sendTransaction({
+            to: transaction.to as `0x${string}`,
+            data: transaction.data as `0x${string}`,
+            account: getWalletAccount(),
+            gas: gas,
+            chain: sepolia,
+          });
+          await walletKit.respondSessionRequest({
+            topic: data.requestEvent?.topic as string,
+            response: {
+              id: data.requestEvent?.id as number,
+              result: txn,
+              jsonrpc: "2.0",
+            },
+          });
+          toast.success("Transaction sent successfully!", { duration: 5000 });
+          const queryClient = new QueryClient();
+          queryClient.invalidateQueries({ queryKey: ["balances"] });
+          break;
+        }
 
-        // Convert the message to a string
-        const message = hexToString(requestParamsMessage);
+        case "solana_signMessage": {
+          const message = getMessage();
+          const signature = await signSolanaMessage(message as string);
+          await walletKit.respondSessionRequest({
+            topic: data.requestEvent?.topic as string,
+            response: {
+              id: data.requestEvent?.id as number,
+              result: { signature },
+              jsonrpc: "2.0",
+            },
+          });
+          toast.success("Solana message signed successfully!");
+          break;
+        }
 
-        // Sign the message
-        const signature = await client.signMessage({
-          message,
-          account: getWalletAccount(),
-        });
+        case "solana_signTransaction": {
+          const transaction = await signSolanaTransaction(
+            data.requestEvent?.params?.request?.params?.transaction
+          );
+          await walletKit.respondSessionRequest({
+            topic: data.requestEvent?.topic as string,
+            response: {
+              id: data.requestEvent?.id as number,
+              result: { signature: transaction.signature },
+              jsonrpc: "2.0",
+            },
+          });
+          toast.success("Solana transaction signed successfully!");
+          break;
+        }
 
-        // Respond to the session request with the signature
-        await walletKit.respondSessionRequest({
-          topic: data.requestEvent?.topic as string,
-          response: {
-            id: data.requestEvent?.id as number,
-            result: signature,
-            jsonrpc: "2.0",
-          },
-        });
-        onOpenChange(false);
-        toast.success("Message signed successfully!");
-      } else if (
-        data.requestEvent?.params?.request?.method === "eth_sendTransaction"
-      ) {
-        const transaction = data.requestEvent?.params?.request
-          ?.params[0] as encodedTransaction;
-        const walletClient = getWalletClient();
+        case "polkadot_signTransaction": {
+          const signature = await signPolkadotTransaction(
+            data?.requestEvent?.params?.request?.params?.transactionPayload
+          );
+          await walletKit.respondSessionRequest({
+            topic: data.requestEvent?.topic as string,
+            response: {
+              id: data.requestEvent?.id as number,
+              result: { signature: signature.signature },
+              jsonrpc: "2.0",
+            },
+          });
+          toast.success("Polkadot transaction signed successfully!");
+          break;
+        }
 
-        const gas = await estimateGas(transaction);
+        case "polkadot_signMessage": {
+          const signature = await signPolkadotMessage(
+            data?.requestEvent?.params?.request?.params?.message
+          );
+          await walletKit.respondSessionRequest({
+            topic: data.requestEvent?.topic as string,
+            response: {
+              id: data.requestEvent?.id as number,
+              result: { signature: signature.signature },
+              jsonrpc: "2.0",
+            },
+          });
+          toast.success("Polkadot message signed successfully!");
+          break;
+        }
 
-        const txn = await walletClient.sendTransaction({
-          to: transaction.to as `0x${string}`,
-          data: transaction.data as `0x${string}`,
-          account: getWalletAccount(),
-          gas: gas,
-          chain: sepolia,
-        });
-
-        await walletKit.respondSessionRequest({
-          topic: data.requestEvent?.topic as string,
-          response: {
-            id: data.requestEvent?.id as number,
-            result: txn,
-            jsonrpc: "2.0",
-          },
-        });
-
-        toast.success("Transaction sent successfully!", {
-          duration: 5000,
-        });
-
-        const queryClient = new QueryClient();
-        queryClient.invalidateQueries({ queryKey: ["balances"] });
-
-        onOpenChange(false);
+        default: {
+          toast.error(`Unsupported method: ${method}`);
+          console.error(`Unsupported method: ${method}`);
+        }
       }
+      onOpenChange(false);
     } catch (error) {
       console.error("Error responding to session request:", error);
-      toast.error("Error");
+      toast.error("Error processing request");
     }
   }, [data.requestEvent, walletKit, onOpenChange]);
 

@@ -19,18 +19,44 @@ import {
   WalletClient,
 } from "viem";
 import { encodedTransaction, Transaction } from "@/types";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import { Keyring } from "@polkadot/keyring";
 import { cryptoWaitReady } from "@polkadot/util-crypto";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { formatBalance } from "@polkadot/util";
+import { formatBalance, u8aToHex } from "@polkadot/util";
 import { useChainStore } from "@/store/chain";
 import { sepolia, baseSepolia } from "viem/chains";
 import type { AccountInfo } from "@polkadot/types/interfaces";
+import bs58 from "bs58";
+import nacl from "tweetnacl";
+import { SignerPayloadJSON } from "@polkadot/types/types";
+import { TypeRegistry } from "@polkadot/types";
 
 let walletKit: IWalletKit | null = null;
 let privateKey: `0x${string}` = generatePrivateKey();
+
+// Add new constants
+const CHAIN_RPC = {
+  "solana-devnet": "https://api.devnet.solana.com",
+  "polkadot-westend": "wss://westend-rpc.polkadot.io",
+} as const;
+
+const USDC_ADDRESSES = {
+  sepolia: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+  "base-sepolia": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  "solana-devnet": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+} as const;
+
+// Create reusable functions for common operations
+const getSeedPhrase = (): string => {
+  const seedPhrase = process.env.NEXT_PUBLIC_SEED_PHRASE;
+  if (!seedPhrase) {
+    console.error("Seed phrase not found");
+    throw new Error("Seed phrase not found");
+  }
+  return seedPhrase;
+};
 
 // Called when the app is initialized
 export async function initializeWallet() {
@@ -63,77 +89,75 @@ export async function initializeWallet() {
 // Returns the walletkit instance
 export function getWalletKit(): IWalletKit {
   if (!walletKit) {
-    throw new Error("WalletKit not initialized");
+    console.error("WalletKit not initialized");
   }
-  return walletKit;
+  return walletKit as IWalletKit;
 }
 
-export function getAddress(): string {
-  const chain = useChainStore.getState().chain;
+export function getSolanaKeypair(): Keypair {
   const seedPhrase = process.env.NEXT_PUBLIC_SEED_PHRASE!;
-
-  if (chain === "solana-devnet") {
-    if (!seedPhrase) {
-      throw new Error("Seed phrase not found");
-    }
-    const seed = Uint8Array.from(
-      Buffer.from(seedPhrase.replace(/ /g, ""))
-    ).slice(0, 32);
-    const keypair = Keypair.fromSeed(seed);
-    return keypair.publicKey.toBase58();
+  if (!seedPhrase) {
+    console.error("Seed phrase not found");
   }
-  if (chain === "polkadot-westend") {
-    if (!seedPhrase) {
-      throw new Error("Seed phrase not found");
-    }
-    const keyring = new Keyring({ type: "sr25519" });
-    const pair = keyring.addFromMnemonic(seedPhrase);
-    return pair.address;
-  }
-  const seeds = seedPhrase?.split(" ");
-  if (!seeds) {
-    throw new Error("Seed phrase not found");
-  }
-  const account = mnemonicToAccount(seedPhrase);
-  return account.address;
+  const seed = Uint8Array.from(Buffer.from(seedPhrase.replace(/ /g, ""))).slice(
+    0,
+    32
+  );
+  return Keypair.fromSeed(seed);
 }
 
+// Modify getAddress to use getSeedPhrase
+export function getAddress(type: "evm" | "solana" | "polkadot"): string {
+  const seedPhrase = getSeedPhrase();
+
+  switch (type) {
+    case "solana":
+      return getSolanaKeypair().publicKey.toBase58();
+    case "polkadot":
+      return new Keyring({ type: "sr25519" }).addFromMnemonic(seedPhrase)
+        .address;
+    default:
+      return mnemonicToAccount(seedPhrase).address;
+  }
+}
+
+// Create reusable client creators
+const createEvmPublicClient = (chain: "sepolia" | "base-sepolia") =>
+  createPublicClient({
+    transport: http(),
+    chain: chain === "sepolia" ? sepolia : baseSepolia,
+  });
+
+// Modify getBalance to use the new client creator
 export async function getBalance(): Promise<string> {
   const chain = useChainStore.getState().chain;
 
   try {
     switch (chain) {
       case "sepolia":
-      case "base-sepolia":
-        const publicClient = createPublicClient({
-          transport: http(),
-          chain: chain === "sepolia" ? sepolia : baseSepolia,
-        });
+      case "base-sepolia": {
+        const publicClient = createEvmPublicClient(chain);
         const balance = await publicClient.getBalance({
-          address: getAddress() as `0x${string}`,
+          address: getAddress("evm") as `0x${string}`,
         });
         return formatUnits(balance, 18);
+      }
 
-      case "solana-devnet":
-        const connection = new Connection("https://api.devnet.solana.com");
-        try {
-          const address = getAddress();
-          const solBalance = await connection.getBalance(
-            new PublicKey(address)
-          );
-          return (solBalance / LAMPORTS_PER_SOL).toString();
-        } catch (solError) {
-          console.error("Solana balance error:", solError);
-          throw solError;
-        }
+      case "solana-devnet": {
+        const connection = new Connection(CHAIN_RPC["solana-devnet"]);
+        const solBalance = await connection.getBalance(
+          new PublicKey(getAddress("solana"))
+        );
+        return (solBalance / LAMPORTS_PER_SOL).toString();
+      }
 
       case "polkadot-westend":
         let api: ApiPromise | null = null;
         try {
-          const wsProvider = new WsProvider("wss://westend-rpc.polkadot.io");
+          const wsProvider = new WsProvider(CHAIN_RPC["polkadot-westend"]);
           api = await ApiPromise.create({ provider: wsProvider });
           const accountInfo = (await api.query.system.account(
-            getAddress()
+            getAddress("polkadot")
           )) as AccountInfo;
           const {
             data: { free, reserved },
@@ -191,6 +215,7 @@ export const estimateGas = async (transaction: encodedTransaction) => {
   return gas;
 };
 
+// Modify getUsdcBalance to use constants and client creators
 export const getUsdcBalance = async () => {
   const chain = useChainStore.getState().chain;
 
@@ -198,25 +223,20 @@ export const getUsdcBalance = async () => {
     switch (chain) {
       case "sepolia":
       case "base-sepolia": {
-        const publicClient = createPublicClient({
-          transport: http(),
-          chain: sepolia,
-        });
+        const publicClient = createEvmPublicClient(chain);
         const usdcBalance = await publicClient.readContract({
-          address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          address: USDC_ADDRESSES[chain],
           abi: erc20Abi,
           functionName: "balanceOf",
-          args: [getAddress() as `0x${string}`],
+          args: [getAddress("evm") as `0x${string}`],
         });
         return Number(formatUnits(usdcBalance, 6)).toFixed(2);
       }
 
       case "solana-devnet": {
-        const connection = new Connection("https://api.devnet.solana.com");
-        const usdcMint = new PublicKey(
-          "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
-        ); // Devnet USDC mint
-        const address = getAddress();
+        const connection = new Connection(CHAIN_RPC["solana-devnet"]);
+        const usdcMint = new PublicKey(USDC_ADDRESSES[chain]);
+        const address = getAddress("solana");
         const tokenAccount = await connection.getTokenAccountsByOwner(
           new PublicKey(address),
           {
@@ -253,3 +273,89 @@ export function getWalletClient(): WalletClient {
     chain: sepolia,
   });
 }
+
+export async function signSolanaMessage(message: string): Promise<string> {
+  const seedPhrase = process.env.NEXT_PUBLIC_SEED_PHRASE!;
+  if (!seedPhrase) {
+    console.error("Seed phrase not found");
+  }
+
+  const keypair = getSolanaKeypair();
+
+  console.log("keypair", keypair.publicKey.toBase58());
+
+  // Sign the message
+  const signature = nacl.sign.detached(bs58.decode(message), keypair.secretKey);
+
+  return bs58.encode(signature);
+}
+
+export async function signSolanaTransaction(
+  transactionBase58: string
+): Promise<{
+  transaction: string;
+  signature: string;
+}> {
+  try {
+    const keypair = getSolanaKeypair();
+
+    // Deserialize the transaction - handle both base58 and base64 formats
+    let transactionBytes: Uint8Array;
+    try {
+      transactionBytes = bs58.decode(transactionBase58);
+    } catch {
+      transactionBytes = Buffer.from(transactionBase58, "base64");
+    }
+
+    // Deserialize as a VersionedTransaction
+    const deserializedTx = VersionedTransaction.deserialize(transactionBytes);
+
+    // Sign the transaction
+    deserializedTx.sign([keypair]);
+
+    // Get the signature and serialize the transaction to base64
+    const signature = bs58.encode(deserializedTx.signatures[0]);
+    const serializedTx = Buffer.from(deserializedTx.serialize()).toString(
+      "base64"
+    );
+
+    return {
+      transaction: serializedTx,
+      signature: signature,
+    };
+  } catch (error) {
+    console.error("Error signing Solana transaction:", error);
+    throw error;
+  }
+}
+
+export const getPolkadotKeypair = () => {
+  const seedPhrase = process.env.NEXT_PUBLIC_SEED_PHRASE!;
+  if (!seedPhrase) {
+    console.error("Seed phrase not found");
+  }
+  const keyring = new Keyring({ type: "sr25519" });
+  const pair = keyring.addFromMnemonic(seedPhrase);
+  return pair;
+};
+
+export const signPolkadotMessage = async (message: string) => {
+  const keypair = getPolkadotKeypair();
+
+  return {
+    signature: u8aToHex(keypair.sign(message)),
+  };
+};
+
+export const signPolkadotTransaction = async (
+  transaction: SignerPayloadJSON
+) => {
+  const keypair = getPolkadotKeypair();
+  const registry = new TypeRegistry();
+  const txPayload = registry.createType("ExtrinsicPayload", transaction, {
+    version: transaction.version,
+  });
+
+  const { signature } = txPayload.sign(keypair);
+  return { signature };
+};

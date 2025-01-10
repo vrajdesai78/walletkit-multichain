@@ -67,12 +67,34 @@ export function WalletDetails() {
           size='sm'
           className='h-7 px-2 hover:bg-gray-100/80'
           onClick={() => {
-            navigator.clipboard.writeText(getAddress());
+            navigator.clipboard.writeText(
+              getAddress(
+                chain === "solana-devnet"
+                  ? "solana"
+                  : chain === "polkadot-westend"
+                  ? "polkadot"
+                  : "evm"
+              )
+            );
             toast.success("Address copied");
           }}
         >
           <div className='font-mono text-xs text-gray-600'>
-            {getAddress().slice(0, 6)}...{getAddress().slice(-4)}
+            {getAddress(
+              chain === "solana-devnet"
+                ? "solana"
+                : chain === "polkadot-westend"
+                ? "polkadot"
+                : "evm"
+            ).slice(0, 6)}
+            ...
+            {getAddress(
+              chain === "solana-devnet"
+                ? "solana"
+                : chain === "polkadot-westend"
+                ? "polkadot"
+                : "evm"
+            ).slice(-4)}
           </div>
           <CopyIcon className='h-3 w-3 ml-1.5' />
         </Button>
@@ -92,32 +114,34 @@ export function WalletDetails() {
       </div>
 
       {/* Tokens */}
-      <div className='space-y-2'>
-        <div className='flex items-center justify-center px-1 text-xs'>
-          <p className='font-medium text-gray-600'>Tokens</p>
-        </div>
+      {Number(balances.usdc) > 0 && (
+        <div className='space-y-2'>
+          <div className='flex items-center justify-center px-1 text-xs'>
+            <p className='font-medium text-gray-600'>Tokens</p>
+          </div>
 
-        <div className='bg-white/80 rounded-lg p-2 hover:bg-gray-50/80'>
-          <div className='flex items-center justify-between'>
-            <div className='flex items-center gap-2'>
-              <Image
-                src='https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
-                alt='USDC'
-                width={28}
-                height={28}
-                className='rounded-full ring-1 ring-gray-100'
-                loader={({ src }) => src}
-              />
-              <div>
-                <p className='font-medium text-sm text-gray-900'>USDC</p>
+          <div className='bg-white/80 rounded-lg p-2 hover:bg-gray-50/80'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <Image
+                  src='https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
+                  alt='USDC'
+                  width={28}
+                  height={28}
+                  className='rounded-full ring-1 ring-gray-100'
+                  loader={({ src }) => src}
+                />
+                <div>
+                  <p className='font-medium text-sm text-gray-900'>USDC</p>
+                </div>
               </div>
-            </div>
-            <div className='text-right'>
-              <div className='font-medium text-sm'>{balances.usdc}</div>
+              <div className='text-right'>
+                <div className='font-medium text-sm'>{balances.usdc}</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

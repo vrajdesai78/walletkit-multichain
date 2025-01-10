@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { SignClientTypes } from "@walletconnect/types";
 import { ConnectionDialog } from "@/components/ConnectionDialog";
 import { useWalletStore } from "@/store/wallet";
-import { decodeTransaction, getWalletKit } from "@/utils/helper";
+import { getWalletKit } from "@/utils/helper";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { WalletDetails } from "@/components/WalletDetails";
 import { SessionDetails } from "@/components/SessionDetails";
+import { toast } from "react-hot-toast";
 
 export default function Home() {
   const [dialogState, setDialogState] = useState({
@@ -22,6 +23,7 @@ export default function Home() {
 
   const onSessionProposal = useCallback(
     async (proposal: SignClientTypes.EventArguments["session_proposal"]) => {
+      console.log("proposal", proposal?.params);
       setDialogState((prev) => ({ ...prev, proposalOpen: true }));
       setData({ proposal });
     },
@@ -31,16 +33,26 @@ export default function Home() {
   const onSessionRequest = useCallback(
     async (request: SignClientTypes.EventArguments["session_request"]) => {
       try {
-        const { method, params } = request.params.request;
-        if (method === "eth_sendTransaction") {
-          const transaction = decodeTransaction(params[0]);
+        const { method } = request.params.request;
+        const methodConfig: Record<string, { txnType?: "send" }> = {
+          eth_sendTransaction: { txnType: "send" },
+          solana_signTransaction: { txnType: "send" },
+          polkadot_signTransaction: { txnType: "send" },
+          personal_sign: {},
+          polkadot_signMessage: {},
+          solana_signMessage: {},
+        };
+
+        if (method in methodConfig) {
           setDialogState((prev) => ({ ...prev, requestOpen: true }));
-          setData({ requestEvent: request, txnData: transaction });
-        } else if (method === "personal_sign") {
-          setDialogState((prev) => ({ ...prev, requestOpen: true }));
-          setData({ requestEvent: request });
+          setData({
+            requestEvent: request,
+            ...(methodConfig[method].txnType && {
+              txnType: methodConfig[method].txnType,
+            }),
+          });
         } else {
-          throw new Error("Unsupported method");
+          toast.error("Unsupported method");
         }
       } catch (error) {
         console.error(error);
@@ -50,23 +62,22 @@ export default function Home() {
   );
 
   useEffect(() => {
+    if (!walletkit) return;
+
+    const handleSessionDelete = () => {
+      setActiveSessions(walletkit.getActiveSessions());
+    };
+
     setActiveSessions(walletkit.getActiveSessions());
+    walletkit.on("session_proposal", onSessionProposal);
+    walletkit.on("session_request", onSessionRequest);
+    walletkit.on("session_delete", handleSessionDelete);
 
-    if (walletkit) {
-      walletkit.on("session_proposal", onSessionProposal);
-      walletkit.on("session_request", onSessionRequest);
-      walletkit.on("session_delete", () => {
-        setActiveSessions(walletkit.getActiveSessions());
-      });
-
-      return () => {
-        walletkit.off("session_proposal", onSessionProposal);
-        walletkit.off("session_request", onSessionRequest);
-        walletkit.off("session_delete", () => {
-          setActiveSessions(walletkit.getActiveSessions());
-        });
-      };
-    }
+    return () => {
+      walletkit.off("session_proposal", onSessionProposal);
+      walletkit.off("session_request", onSessionRequest);
+      walletkit.off("session_delete", handleSessionDelete);
+    };
   }, [onSessionProposal, onSessionRequest, walletkit]);
 
   const handleConnect = async () => {
@@ -88,7 +99,7 @@ export default function Home() {
           onOpenChange={() =>
             setDialogState((prev) => ({ ...prev, requestOpen: false }))
           }
-          type={data?.txnData ? "sendTransaction" : "request"}
+          type={data?.txnType === "send" ? "sendTransaction" : "request"}
         />
 
         <div className='text-center mb-8'>
