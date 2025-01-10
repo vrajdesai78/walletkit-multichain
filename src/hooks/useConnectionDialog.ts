@@ -76,7 +76,7 @@ export function useConnectionDialog(
               "solana_signAndSendTransaction",
               "solana_signAllTransactions",
             ],
-            events: [],
+            events: SUPPORTED_EVENTS,
             accounts: [
               `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:${solanaAddress}`,
             ],
@@ -84,7 +84,7 @@ export function useConnectionDialog(
           polkadot: {
             chains: ["polkadot:e143f23803ac50e8f6f8e62695d1ce9e"],
             methods: ["polkadot_signTransaction", "polkadot_signMessage"],
-            events: ["accountChanged"],
+            events: SUPPORTED_EVENTS,
             accounts: [
               `polkadot:e143f23803ac50e8f6f8e62695d1ce9e:${polkadotAddress}`,
             ],

@@ -2,7 +2,12 @@ import { Button } from "@/components/ui/button";
 import { CopyIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { getAddress, getBalance, getUsdcBalance } from "@/utils/helper";
+import {
+  getAddress,
+  getBalance,
+  getUsdcBalance,
+  getWalletKit,
+} from "@/utils/helper";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Select,
@@ -21,11 +26,8 @@ export function WalletDetails() {
     queryKey: ["balances", chain],
     queryFn: async () => {
       try {
-        console.log("Fetching balances for chain:", chain);
         const native = await getBalance();
-        console.log("Received native balance:", native);
         const usdc = await getUsdcBalance();
-        console.log("Received USDC balance:", usdc);
         return { native, usdc };
       } catch (error) {
         console.error("Error in balance query:", error);
@@ -46,9 +48,24 @@ export function WalletDetails() {
       <div className='flex items-center justify-between mb-4'>
         <Select
           defaultValue={chain}
-          onValueChange={(value) => {
+          onValueChange={async (value) => {
             queryClient.invalidateQueries({ queryKey: ["balances"] });
-            setChain(value as TChain);
+            const walletKit = getWalletKit();
+            const topic = walletKit.engine.signClient.session.values.find(
+              (s) => s.topic
+            )?.topic;
+            if (value === "polkadot-westend" || value === "solana-devnet") {
+              setChain(value as TChain);
+              return;
+            }
+            await walletKit.emitSessionEvent({
+              topic: topic as string,
+              event: {
+                name: "chainChanged",
+                data: value === "sepolia" ? 11155111 : 84532,
+              },
+              chainId: value === "sepolia" ? "eip155:11155111" : "eip155:84532",
+            });
           }}
         >
           <SelectTrigger className='w-[160px] h-7 text-xs bg-blue-100/80 text-blue-800 border-0'>

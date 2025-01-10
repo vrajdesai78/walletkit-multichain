@@ -32,6 +32,7 @@ export default function Home() {
 
   const onSessionRequest = useCallback(
     async (request: SignClientTypes.EventArguments["session_request"]) => {
+      console.log("request", request);
       try {
         const { method } = request.params.request;
         const methodConfig: Record<string, { txnType?: "send" }> = {
