@@ -37,7 +37,7 @@ cp .example.env .env.local
 
 - Update the environment variables in `.env.local`:
   - `NEXT_PUBLIC_PROJECT_ID`: Your WalletConnect Project ID (required)
-  - `NEXT_PUBLIC_PRIVATE_KEY`: Your private key (optional)
+  - `NEXT_PUBLIC_SEED_PHRASE`: Your seed phrase
 
 ## Running the Project
 
