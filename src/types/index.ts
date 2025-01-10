@@ -28,3 +28,9 @@ export type encodedTransaction = {
   from: string;
   data: string;
 };
+
+export type TChain =
+  | "sepolia"
+  | "base-sepolia"
+  | "solana-devnet"
+  | "polkadot-westend";

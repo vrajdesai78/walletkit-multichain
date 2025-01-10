@@ -3,24 +3,65 @@ import { CopyIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { getAddress, getBalance, getUsdcBalance } from "@/utils/helper";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useChainStore } from "@/store/chain";
+import { TChain } from "@/types";
 
 export function WalletDetails() {
-  const { data: balances = { eth: "0", usdc: "0" } } = useQuery({
-    queryKey: ["balances"],
+  const { chain, setChain } = useChainStore();
+
+  const { data: balances = { native: "0", usdc: "0" } } = useQuery({
+    queryKey: ["balances", chain],
     queryFn: async () => {
-      const [eth, usdc] = await Promise.all([getBalance(), getUsdcBalance()]);
-      return { eth, usdc };
+      try {
+        console.log("Fetching balances for chain:", chain);
+        const native = await getBalance();
+        console.log("Received native balance:", native);
+        const usdc = await getUsdcBalance();
+        console.log("Received USDC balance:", usdc);
+        return { native, usdc };
+      } catch (error) {
+        console.error("Error in balance query:", error);
+        return { native: "0", usdc: "0" };
+      }
     },
+    retry: false,
+    refetchInterval: false,
   });
 
+  const queryClient = useQueryClient();
+
   return (
-    <div className='bg-white/50 backdrop-blur-sm p-4 rounded-xl shadow border border-gray-100'>
+    <div
+      key={chain}
+      className='bg-white/50 backdrop-blur-sm p-4 rounded-xl shadow border border-gray-100'
+    >
       <div className='flex items-center justify-between mb-4'>
-        <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100/80 text-blue-800'>
-          <div className='w-2 h-2 bg-blue-500 rounded-full mr-1.5 animate-pulse'></div>
-          Sepolia
-        </span>
+        <Select
+          defaultValue={chain}
+          onValueChange={(value) => {
+            queryClient.invalidateQueries({ queryKey: ["balances"] });
+            setChain(value as TChain);
+          }}
+        >
+          <SelectTrigger className='w-[160px] h-7 text-xs bg-blue-100/80 text-blue-800 border-0'>
+            <div className='w-2 h-2 bg-blue-500 rounded-full mr-1.5 animate-pulse'></div>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='sepolia'>Sepolia</SelectItem>
+            <SelectItem value='base-sepolia'>Base Sepolia</SelectItem>
+            <SelectItem value='solana-devnet'>Solana Devnet</SelectItem>
+            <SelectItem value='polkadot-westend'>Polkadot Westend</SelectItem>
+          </SelectContent>
+        </Select>
         <Button
           variant='ghost'
           size='sm'
@@ -41,7 +82,12 @@ export function WalletDetails() {
       <div className='bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg mb-4'>
         <p className='text-xs text-gray-500'>Total Balance</p>
         <div className='text-3xl font-bold text-gray-900 mt-1 mb-0.5'>
-          {Number(balances.eth).toFixed(4)} ETH
+          {Number(balances.native).toFixed(4)}{" "}
+          {chain === "solana-devnet"
+            ? "SOL"
+            : chain === "polkadot-westend"
+            ? "WND"
+            : "ETH"}
         </div>
       </div>
 
