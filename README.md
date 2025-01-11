@@ -1,11 +1,6 @@
 # WalletKit Demo Project
 
-A demo wallet interface showcasing the integration of Reown [WalletKit](https://docs.reown.com/walletkit/web/usage) with Next.js. This wallet is live at [https://walletkit-reown.vercel.app/](https://walletkit-reown.vercel.app/).
-
-## Demo 
-
-https://github.com/user-attachments/assets/76ba3322-7d49-46ea-b41f-64781fe77c9c
-
+A demo wallet interface showcasing the multichain integration of Reown [WalletKit](https://docs.reown.com/walletkit/web/usage) with Next.js. This wallet is live at [https://walletkit-reown.vercel.app/](https://walletkit-reown.vercel.app/).
 
 ## Prerequisites
 
