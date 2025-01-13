@@ -17,10 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useChainStore } from "@/store/chain";
-import { TChain } from "@/types";
 
 export function WalletDetails() {
-  const { chain, setChain } = useChainStore();
+  const { chain } = useChainStore();
 
   const { data: balances = { native: "0", usdc: "0" } } = useQuery({
     queryKey: ["balances", chain],
@@ -51,20 +50,29 @@ export function WalletDetails() {
           onValueChange={async (value) => {
             queryClient.invalidateQueries({ queryKey: ["balances"] });
             const walletKit = getWalletKit();
+            if (value === "polkadot-westend") {
+              return;
+            }
             const topic = walletKit.engine.signClient.session.values.find(
               (s) => s.topic
             )?.topic;
-            if (value === "polkadot-westend" || value === "solana-devnet") {
-              setChain(value as TChain);
-              return;
-            }
+            const chainId =
+              value === "sepolia"
+                ? 11155111
+                : value === "base-sepolia"
+                ? 84532
+                : "EtWTRABZaYq6iMfeYKouRu166VU2xqa1";
+            console.log("chainId", chainId);
             await walletKit.emitSessionEvent({
               topic: topic as string,
               event: {
                 name: "chainChanged",
-                data: value === "sepolia" ? 11155111 : 84532,
+                data: chainId,
               },
-              chainId: value === "sepolia" ? "eip155:11155111" : "eip155:84532",
+              chainId:
+                value === "base-sepolia" || value === "sepolia"
+                  ? `eip155:${chainId}`
+                  : `solana:${chainId}`,
             });
           }}
         >
